@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+h1 {
+        text-align: center;
+}
+
+table, th, td {
+          border: 0px solid black;
+          border-collapse: collapse;
+          text-align: center;
+          font-size: 25px;
+}
+
+hr.line {
+        border: 10px solid;
+        border-radius: 10px;
+}
+
+.largeTable {
+        margin-left: auto;
+        margin-right: auto;
+}
+
+button {
+        font-size: 25px;
+}
+
+</style>
+
+<script>
+var diamondList = [];
+var winFlag = false;
+var scoreEle = [];
+
+/*
+Class for drawing, erasing a diamond shape on a canvas, as well as keeping track of, increasing and reseting score of the diamond racer.
+*/
+class DiamondRacer {
+        constructor(canvas, context, lane, nbrOfLanes, color, score, maxScore){
+                this.context = context;
+                this.lane = lane;
+                this.nbrOfLanes = nbrOfLanes;
+                this.color = color;
+                this.score = score;
+                this.maxScore = maxScore;
+                this.cWidth = canvas.width;
+                this.cHeight = canvas.height;
+                this.x = (this.score+1)/(this.maxScore+2) * this.cWidth;
+                this.y = (this.lane-0.3)/(this.nbrOfLanes+1) * this.cHeight;
+                this.size = this.cHeight / (2*this.nbrOfLanes);
+                this.drawDiamond();
+        }
+
+        drawDiamond(){
+                this.context.save();
+                this.context.beginPath();
+                this.context.moveTo(this.x, this.y);
+
+                this.context.lineTo(this.x - this.size / 2, this.y + this.size / 2);
+
+                this.context.lineTo(this.x, this.y + this.size);
+
+                this.context.lineTo(this.x + this.size / 2, this.y + this.size / 2);
+
+                this.context.closePath();
+
+                this.context.fillStyle = this.color;
+                this.context.fill();
+                this.RGBColor = this.context.getImageData(this.x,this.y+this.size/2,1,1).data;
+                this.context.restore();
+        }
+
+        clearDiamond() {
+                this.context.save();
+                this.context.clearRect(this.x-this.size/2, this.y, this.size, this.size);
+                this.context.restore();
+                if (this.score==0 || this.score==this.maxScore) {
+                        this.context.save();
+                        this.context.beginPath();
+                        this.context.moveTo(this.x, this.y-1);
+                        this.context.lineTo(this.x, this.y + this.size+1);
+                        this.context.lineWidth = 4;
+                        this.context.stroke();
+                        this.context.closePath();
+                        this.context.restore();
+                }
+
+
+        }
+
+        increaseScore () {
+                this.clearDiamond();
+                this.score++;
+                this.x = (this.score+1)/(this.maxScore+2) * this.cWidth;
+                this.drawDiamond();
+                return this.score;
+        }
+
+        resetScore () {
+                this.clearDiamond();
+                this.score = 0;
+                this.x = (this.score+1)/(this.maxScore+2) * this.cWidth;
+                this.drawDiamond();
+        }
+
+
+}
+/*
+Finds the position of the mouse on the canvas.
+*/
+function getMousePos(canvas, event) {
+        var rect = canvas.getBoundingClientRect();
+        return {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+        };
+}
+
+/*
+Sets all the scores to 0 and redraws the diamondracers.
+*/
+function resetRace() {
+        winFlag = false;
+        for (var i = 0; i < diamondList.length; i++) {
+                diamondList[i].resetScore();
+                diamondList[i].drawDiamond();
+                scoreEle[i].textContent = diamondList[i].score.toString();
+        }
+}
+
+/*
+Draws the start and end lines with corresponding labels.
+*/
+function drawGameBoard( canvas, context, maxScore) {
+        fontSize = 22;
+        x1 = 1/(maxScore+2) * canvas.width;
+        y1 = fontSize*1.5;
+        x2 = (maxScore+1)/(maxScore+2) * canvas.width;
+        y2 = canvas.height;
+        context.save();
+        context.lineWidth = 4;
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x1, y2);
+        context.stroke();
+        context.moveTo(x2,y1);
+        context.lineTo(x2,y2);
+        context.stroke();
+        context.closePath();
+        context.font = "22px Arial";
+        context.fillText("Start",x1-fontSize*1.2,y1-fontSize*0.5);
+        context.fillText("End",x2-fontSize,y1-fontSize*0.5);
+        context.restore();
+}
+
+
+window.onload = function(){
+        var colors = ["red","blue","green","yellow"];
+        var canvas = document.getElementById("myCanvas");
+        var context = canvas.getContext("2d");
+        var rgbColors = [];
+        var maxScore = 20;
+
+        drawGameBoard(canvas,context,maxScore);
+        for (var i = 0; i < colors.length; i++) {
+                diamondList[i] = new DiamondRacer(canvas, context, i+1, colors.length, colors[i], 0, maxScore);
+                scoreEle[i] = document.getElementById(colors[i] + "Score");
+                rgbColors[i] = diamondList[i].RGBColor;
+        }
+
+        /*
+        Finds the pressed diamond by comparing RGBA values of the pressed pixel and the diamond colors.
+        Disables the function if a diamond has reached the max score.
+        */
+        canvas.addEventListener('click', function(event) {
+                if (!winFlag) {
+                        mousePos = getMousePos(canvas, event);
+                        var  pressedColor = context.getImageData(mousePos.x, mousePos.y,1,1).data;
+                        var pressedIndex = rgbColors.findIndex((element) => element[0] == pressedColor[0] && element[1] == pressedColor[1] && element[2] == pressedColor[2] && element[3] == pressedColor[3]);
+                        if (pressedIndex>-1) {
+                                if(diamondList[pressedIndex].increaseScore()>maxScore-1) {
+                                        winFlag = true;
+                                }
+                                scoreEle[pressedIndex].textContent = diamondList[pressedIndex].score.toString();
+                        }
+                }
+
+
+        });
+};
+
+</script>
+
+</head>
+
+<body>
+        <h1>Diamond Race!</h1>
+        <table class="largeTable" style="width:100">
+                <tr>
+                        <td>
+                                <canvas id="myCanvas" width="800" height="500" style="border:0px solid black;"></canvas>
+                        </td>
+                        <td>
+                                <table>
+                                        <tr>
+                                                <td style="padding-bottom: 50px;"><button onclick="resetRace()">Reset!</button></td><td></td>
+                                        </tr>
+                                        <tr>
+                                                <td><p>Score board</p></td><td></td>
+                                        </tr>
+                                        <tr>
+                                                <td><hr class="line" style="border-color: red"></td><td><span id="redScore">0</span></td>
+                                        </tr>
+                                        <tr>
+                                                <td><hr class="line" style="border-color: blue"></td><td><span id="blueScore">0</span></td>
+                                        </tr>
+                                        <tr>
+                                                <td><hr class="line" style="border-color: green"></td><td><span id="greenScore">0</span></td>
+                                        </tr>
+                                        <tr>
+                                                <td><hr class="line" style="border-color: yellow"></td><td><span id="yellowScore">0</span></td>
+                                        </tr>
+                                </table>
+                        </td>
+                </tr>
+        </table>
+</body>
+
+
+</html>
